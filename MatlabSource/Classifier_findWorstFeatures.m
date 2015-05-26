@@ -1,15 +1,19 @@
 function flist = Classifier_findWorstFeatures(fv_N, fv_S, num_ft2rmv, ... 
-                                              MLE_flag)
+                                              classificationMode)
 %flist = Classifier_findWorstFeatures(fv_N, fv_S, num_ft2rmv, MLE_flag)
 %
 %   if ML is set to 1, use ML, else lin
 
 assert(nargin >= 3);
 
+SVM = 1;
+LDA = 0;
+MLE = 2;
+
 flist        = [];
 num_features = size(fv_N,2);
 
-if ((nargin == 3) || (MLE_flag == 0))
+if ((nargin == 3) || (classificationMode == SVM))
 
     for i = 1:num_features
 
@@ -27,7 +31,7 @@ if ((nargin == 3) || (MLE_flag == 0))
     end
 
     
-elseif ((nargin == 4) && MLE_flag)
+elseif ((nargin == 4) && classificationMode == MLE)
 
     for i = 1:num_features
         
@@ -52,6 +56,9 @@ elseif ((nargin == 4) && MLE_flag)
                       sum(prob_SinN >= prob_SinS);
         
     end
+    
+
+elseif ((nargin == 4) && classificationMode == LDA)
     
 end
     

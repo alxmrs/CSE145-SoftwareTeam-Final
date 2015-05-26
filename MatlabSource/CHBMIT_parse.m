@@ -13,10 +13,16 @@ assert(bottomSeg <= topSeg);
 %%%%%%%%% READ .edf %%%%%%%%%
 
 patientNum_str  = num2str(patientNum);
-path_str_1to9   = 'CHB-MIT/Patient pnum/edf Files/chb0pnum_0snum.edf';
-path_str_10to99 = 'CHB-MIT/Patient pnum/edf Files/chb0pnum_snum.edf';
 
-for i = (bottomSeg:topSeg)
+if patientNum < 10
+    path_str_1to9   = 'Data/CHBMIT/chb0pnum/chb0pnum_0snum.edf';
+    path_str_10to99 = 'Data/CHBMIT/chb0pnum/chb0pnum_snum.edf';
+else
+    path_str_1to9   = 'Data/CHBMIT/chbpnum/chbpnum_0snum.edf';
+    path_str_10to99 = 'Data/CHBMIT/chbpnum/chbpnum_snum.edf';
+end
+
+for i = bottomSeg:topSeg
 
     if i<10
         temp_str      = strrep(path_str_1to9, 'pnum', patientNum_str);
@@ -34,12 +40,12 @@ fprintf('\n');
 
 patient_data = [];
 
-for i = (bottomSeg:topSeg)
+for i = bottomSeg:topSeg
     fprintf('Parsing segment %d\n', i);
     [hdr record] = edfread(filename(i,:));
-    this.hdr     = hdr;
-    this.hdr.sf  = 256;
-    this.record  = record;
+    this.record = record;
+    this.hdr    = hdr;
+    this.hdr.sf = 256;
     patient_data = [patient_data; this];
     fprintf('\n');
 end
