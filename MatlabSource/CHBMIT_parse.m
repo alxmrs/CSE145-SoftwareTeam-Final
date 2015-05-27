@@ -1,4 +1,4 @@
-function [patient_data] = CHBMIT_parse(patientNum, segments);
+function [patient_data] = CHBMIT_parse(patientNum, segments)
 % [patient_data] = CHBMIT_parse(patientNum, numSegments)
 
 assert(nargin == 2);

@@ -1,10 +1,24 @@
 %%%%%% CHB-MIT Master Script %%%%%%
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%   SET FLAGS
+
 flag_logFeatures     = 1;
 flag_parseTrainData  = 0;
 flag_parseTestData   = 0;
 flag_extractTrFt     = 0;
 flag_extractTeFt     = 0;
+
+%
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%   ~
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%   SET PARAMETERS
 
 LDA = 0;
 SVM = 1;
@@ -19,15 +33,6 @@ channel          = 'FT10T8';
 
 num_ft2rmv = 5;
 
-seizStr_1to9   = 'Data/CHBMIT/chb0pnum/seizures.csv';
-seizStr_10to99 = 'Data/CHBMIT/chbpnum/seizures.csv';
-
-if patientNum < 10
-    seizures = csvread(strrep(seizStr_1to9,'pnum',num2str(patientNum)));
-else
-    seizures = csvread(strrep(seizStr_10to99,'pnum',num2str(patientNum)));
-end
-
 fprintf('\n');
 
 if classificationMode == MLE
@@ -38,6 +43,33 @@ else
     fprintf('Classification mode - LDA\n');
 end
 
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%   ~
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%   READ SEIZURE DATA
+
+seizStr_1to9   = 'Data/CHBMIT/chb0pnum/seizures.csv';
+seizStr_10to99 = 'Data/CHBMIT/chbpnum/seizures.csv';
+
+if patientNum < 10
+    seizures = csvread(strrep(seizStr_1to9,'pnum',num2str(patientNum)));
+else
+    seizures = csvread(strrep(seizStr_10to99,'pnum',num2str(patientNum)));
+end
+
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%   ~
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%   PARSE TRAINING DATA
+
 if flag_parseTrainData
     fprintf('\n');
     fprintf('Parsing CHB-MIT training data...\n');
@@ -46,7 +78,15 @@ if flag_parseTrainData
     CHBMIT_traindata = CHBMIT_preprocess(CHBMIT_traindata);
 end
 
-%%%% Get features by splitting into windows
+%
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%   ~
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%   EXTRACT TRAINING FEATURES
 
 numSegments  = size(CHBMIT_traindata,1);
 samplingFreq = 256;
@@ -136,20 +176,33 @@ if flag_extractTrFt
     size_S = size(fv_S_train,1);
     size_N = size(fv_N_train,1);
 
+    
     fv_N_train = fv_N_train(randperm(size_N),:);
     fv_N_train = fv_N_train(1:size_S,:);
 
     flist = Classifier_findWorstFeatures(fv_N_train, fv_S_train, ...
                                          num_ft2rmv, classificationMode);
-
+                                     
+    
     fv_train = [fv_N_train; fv_S_train];
     fv_train = Classifier_removeFeatures(fv_train, flist);
 
+    
     lv_train = [zeros(size_S,1); ones(size_S,1)];
 
-    fprintf('Done.\n');
 
+    fprintf('Done.\n');
 end
+
+%
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%   ~
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%   PARSE TEST DATA
 
 if flag_parseTestData
     fprintf('\n');
@@ -209,6 +262,16 @@ if flag_extractTeFt
 
 end
 
+%
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%   ~
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%   CLASSIFY
+
 if classificationMode == MLE
        
     fprintf('\n');
@@ -236,16 +299,25 @@ elseif classificationMode == SVM
 else
     
     fprintf('\n');
-    fprintf('Training LDA Classifier...\n');                  
-    SVM_params = fitcsvm(fv_train, lv_train);
+    fprintf('Training LDA Classifier...\n'); 
     fprintf('Done.\n');
 
     fprintf('\n');
     fprintf('Classifying test data...\n');
-    labels = predict(SVM_params, fv_test);
+    
     fprintf('Done.\n');
     
 end
+
+%
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%   ~
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%   PRINT RESULTS
 
 numSegs     = testSegments(2)-testSegments(1)+1;
 sampsPerSeg = size(fv_test,1)/numSegs;

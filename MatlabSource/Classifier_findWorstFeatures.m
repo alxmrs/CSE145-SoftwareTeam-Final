@@ -31,7 +31,7 @@ if ((nargin == 3) || (classificationMode == SVM))
     end
 
     
-elseif ((nargin == 4) && classificationMode == MLE)
+elseif ((nargin == 4) && classificationMode ~= SVM)
 
     for i = 1:num_features
         
@@ -56,9 +56,6 @@ elseif ((nargin == 4) && classificationMode == MLE)
                       sum(prob_SinN >= prob_SinS);
         
     end
-    
-
-elseif ((nargin == 4) && classificationMode == LDA)
     
 end
     
