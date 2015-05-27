@@ -1,14 +1,14 @@
 function [fv, lv] = ...
-    CHBMIT_ensemble_RandPerm_fv(...
-    input, segments, seizures, numSVMs, flag_log, train)
-%[f l] = CHBMIT_ensemble_RandPerm_fv(input,segments,seizures,numSVMs, ...
-%                                    flag_log, train)
+    CHBMIT_ensemble_RandPerm_fv(params, input, flag_log, train)
+%[fv, lv] = CHBMIT_ensemble_RandPerm_fv(params, input, flag_log, train)
 
-assert(nargin == 6);
+assert(nargin == 4);
 
-samplingFreq    = 256;
-windowSize_sec  = 10;
-windowSlide_sec = 1;
+samplingFreq    = params.samplingFreq;
+windowSize_sec  = params.windowSize_sec;
+windowSlide_sec = params.windowSlide_sec;
+numSVMs         = params.numSVMs;
+seizures        = params.seizures;
 
 if train
     
@@ -38,13 +38,20 @@ numFeatures  = ...
 
 if train
 
+    segments = params.trainSegments;
+    
     for svm = (1:numSVMs)
         fv(svm).fv = [];
         lv(svm).lv = [];
     end
     
 else
+    
+    segments = params.testSegments;
+    
     fv = [];
+    lv = [];
+    
 end
 
 for seg = (1:numSegments)
@@ -67,7 +74,7 @@ for seg = (1:numSegments)
     
     else
        
-        numSubSegments = seg_numSeconds/windowSlide_sec;
+        numSubSegments = numSVMs*seg_numSeconds/windowSize_sec;
         
     end
         
@@ -93,13 +100,16 @@ for seg = (1:numSegments)
             fprintf('%%');
             count = -seg_numSamples/32;
         else
-            count = count + windowSlide;
+            if train
+                count = count + windowSlide;
+            else
+                count = count + windowSize/numSVMs;
+            end
         end
         
-        offset         = 1+(subseg-1)*windowSlide;
-        
         if train
-            
+        
+            offset = 1+(subseg-1)*(windowSlide);
             thisSubSegment = thisSegment(:,offset:offset+windowSize-1);
         
             rp = randperm(numSVMs);
@@ -118,10 +128,12 @@ for seg = (1:numSegments)
         
         else
             
-            thisSubSegment = thisSegment(:,offset:offset+windowSlide-1);
+            offset = 1+(subseg-1)*(windowSize/numSVMs);
+            thisSubSegment = ...
+                thisSegment(:,offset:offset+windowSize/numSVMs-1);
+            
             fv = [fv; Classifier_getFeatures(thisSubSegment, flag_log)];
             
-            time_sec = 1+(subseg-1)*windowSlide_sec + windowSlide_sec/2;
         end
         
         for svm = (1:numSVMs)
@@ -132,7 +144,7 @@ for seg = (1:numSegments)
                     (rp(svm)-1)*subWindowSize_sec + subWindowSize_sec/2;
             else
                 time_sec = ...
-                    1+(subseg-1)*windowSlide_sec + windowSlide_sec/2;
+                    1+(subseg-1)*windowSize/numSVMs+windowSize/(numSVMs*2);
             end
         
             if seizurePresent
@@ -147,13 +159,25 @@ for seg = (1:numSegments)
                 end
             end
 
-            if seizurePresent && ((time_sec >= seizureStart) &&   ...
-                    (time_sec <= seizureEnd))
-                lv(svm).lv = [lv(svm).lv; 1];
+            if train
+                
+                if seizurePresent && ((time_sec >= seizureStart) &&   ...
+                        (time_sec <= seizureEnd))
+                    lv(svm).lv = [lv(svm).lv; 1];
+                else
+                    lv(svm).lv = [lv(svm).lv; 0];
+                end
+                
             else
-                lv(svm).lv = [lv(svm).lv; 0];
+                
+                if seizurePresent && ((time_sec >= seizureStart) &&   ...
+                        (time_sec <= seizureEnd))
+                    lv = [lv; 1];
+                else
+                    lv = [lv; 0];
+                end
             end
-        
+            
         end
     end
     

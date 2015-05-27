@@ -189,8 +189,7 @@ if flag_extractTrFt
 
     
     lv_train = [zeros(size_S,1); ones(size_S,1)];
-
-
+    
     fprintf('Done.\n');
 end
 

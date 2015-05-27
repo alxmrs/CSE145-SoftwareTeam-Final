@@ -1,92 +1,125 @@
-function [  ] = CHBMIT_printResults( testSegments, seizures, data, labels )
+function [  ] = CHBMIT_printResults( params, data, labels, lv_test )
 
-samplingFreq = 256;
+assert(nargin == 4);
+
+numSVMs        = params.numSVMs;
+samplingFreq   = params.samplingFreq;
+windowSize     = params.windowSize_sec*samplingFreq;
+testSegments   = params.testSegments;
+seizures       = params.seizures;
+secsPerLabel   = (params.windowSize_sec)/(params.numSVMs);
 
 fprintf('\n');
 fprintf('Results...\n');
 fprintf('\n');
 
-goodCount = 0;
-totCount  = 0;
+count.tot.S  = 0;
+count.tot.N  = 0;
+
+count.good.S = 0;
+count.good.N = 0;
 
 numSegs = testSegments(2)-testSegments(1)+1;
+
+offset = 1;
 
 for seg = (1:numSegs)
     
     fprintf('Segment %d\n', seg+(testSegments(1)-1));
     fprintf('\n');
     
-    seizIndex         = find(seizures(:,1)==(seg+testSegments(1)-1));
-    numSeizures       = size(seizIndex,1);
+    seizureIndex = find(seizures(:,1)==(seg+testSegments(1)-1));
+    numSeizures  = size(seizureIndex,1);
     
-    segmentLength = size(data(seg).record,2);
-    
+    segmentLength     = size(data(seg).record,2);
     segmentLength_sec = segmentLength/samplingFreq;
-    seizurePresent    = 0;
+    
+    numLabelsInSeg = numSVMs*segmentLength/windowSize;
     
     if numSeizures >= 1
+        
         seizurePresent = 1;
-        fprintf('  Seizure at...\n');
+        fprintf('  Seizure detected at...\n');
+        
         for i = (1:numSeizures)
-            seizureStart   = seizures(seizIndex(i),2);
-            seizureEnd     = seizures(seizIndex(i),3);
+            
+            seizureStart = seizures(seizureIndex(i),2);
+            seizureEnd   = seizures(seizureIndex(i),3);
             fprintf('    [should be %d to %d seconds]\n', ...
                 seizureStart, seizureEnd);
+            
         end
+        
     else
-        fprintf('  Seizure at... [should be none]\n');
+        
+        seizurePresent = 0;
+        fprintf('  Seizure detected at...\n')
+        fprintf('    [should be none]\n')
+        
     end
     
     fprintf('\n');
     
-    seizIndices = find(labels(:,seg) == 1);
-    numSeiz     = size(seizIndices,1);
-    totCount    = totCount + numSeiz;
-
-    lastSeiz   = -1000;
-    lastConsec = 0;
     
-    for seiz = (1:numSeiz)
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    theseLabels = labels(offset:offset+numLabelsInSeg-1);
+    
+    for l = (1:numLabelsInSeg)
         
-        thisSeiz = seizIndices(seiz);
+        count.tot.S = count.tot.S + theseLabels(l);
+        count.tot.N = count.tot.N + ~theseLabels(l);
         
-        if (thisSeiz*secsPerFeat >= seizureStart) && ...
-           (thisSeiz*secsPerFeat <= seizureEnd)
-            goodCount = goodCount + 1;
-        end
+        time_sec = 1+(l-1)*secsPerLabel + secsPerLabel/2;
         
-        if seiz ~= numSeiz
-            nextSeiz = seizIndices(seiz+1);
-        end
-        
-        if thisSeiz-1 == lastSeiz
-            lastConsec = 1;
-        else
-            if lastConsec
-                topSeiz = lastSeiz;
-                %fprintf('    %d to %d seconds\n', ...
-                 %       bottomSeiz*secsPerFeat, topSeiz*secsPerFeat);
+        if seizurePresent
+            
+            seizureStart = ...
+                seizures(find(seizures(:,1)==(seg+testSegments(1)-1)), 2);
+            
+            seizureEnd   = ...
+                seizures(find(seizures(:,1)==(seg+testSegments(1)-1)), 3);
+            
+            for seiz = (1:numSeizures)
+                
+                if (time_sec >= seizureStart(seiz)) && ...
+                        (time_sec <= seizureEnd(seiz))
+                    
+                    if theseLabels(l)
+                        count.good.S = count.good.S+1;
+                    end
+                    
+                    break;
+                    
+                elseif ~theseLabels(l)
+                    count.good.N = count.good.N+1;
+                end
+                
             end
             
-            if thisSeiz+1 ~= nextSeiz
-                %fprintf('    %d\n', secsPerFeat*thisSeiz);
-            end
-            bottomSeiz = thisSeiz;
-            lastConsec = 0;
         end
         
-        lastSeiz = thisSeiz;
     end
     
-    fprintf('\n');
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    offset = offset + numLabelsInSeg;
+    
 end
 
 fprintf('\n');
-fprintf('%.1f%% of seizure labels are TRUE  positives.\n', ...
-        (100*goodCount)/totCount);
-fprintf('%.1f%% of seizure labels are FALSE positives.\n', ...
-        (100*(totCount-goodCount))/totCount);
-
+fprintf('%.1f%% of seizure labels are correct.\n', ...
+        (100*count.good.S)/count.tot.S);
+fprintf('%.1f%% of seizure labels are incorrect.\n', ...
+        (100*(count.tot.S-count.good.S))/count.tot.S);
+    
+fprintf('\n');
+fprintf('%.1f%% of non-seizure labels are correct.\n', ...
+        (100*count.good.N)/count.tot.N);
+fprintf('%.1f%% of non-seizure labels are incorrect.\n', ...
+        (100*(count.tot.N-count.good.N))/count.tot.N);
+    
 fprintf('\n');
 fprintf('Process Complete.\n');
 fprintf('\n');

@@ -66,6 +66,7 @@ badCount_sorted   = badCount_sorted(end-(num_ft2rmv-1):end);
 counter = 0;
 i       = num_ft2rmv;
 oldval  = 0;
+
 while counter < num_ft2rmv
     thisval = badCount_sorted(i);
     if thisval ~= oldval
@@ -75,4 +76,9 @@ while counter < num_ft2rmv
     end
     i = i - 1;
 end
+
+if counter > num_ft2rmv
+    flist = flist(1:num_ft2rmv);
+end
+
 end
