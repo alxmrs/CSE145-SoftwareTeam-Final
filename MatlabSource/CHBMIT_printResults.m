@@ -2,28 +2,30 @@ function [  ] = CHBMIT_printResults( params, data, labels, lv_test )
 
 assert(nargin == 4);
 
-numSVMs        = params.numSVMs;
+numModules     = params.numModules;
 samplingFreq   = params.samplingFreq;
 windowSize     = params.windowSize_sec*samplingFreq;
 testSegments   = params.testSegments;
 seizures       = params.seizures;
-secsPerLabel   = (params.windowSize_sec)/(params.numSVMs);
+secsPerLabel   = (params.windowSize_sec)/(params.numModules);
 
 fprintf('\n');
 fprintf('Results...\n');
 fprintf('\n');
 
-count.tot.S  = 0;
-count.tot.N  = 0;
 
-count.good.S = 0;
-count.good.N = 0;
 
 numSegs = testSegments(2)-testSegments(1)+1;
 
 offset = 1;
 
 for seg = (1:numSegs)
+    
+    count(seg).tot.S  = 0;
+    count(seg).tot.N  = 0;
+
+    count(seg).good.S = 0;
+    count(seg).good.N = 0;
     
     fprintf('Segment %d\n', seg+(testSegments(1)-1));
     fprintf('\n');
@@ -34,7 +36,7 @@ for seg = (1:numSegs)
     segmentLength     = size(data(seg).record,2);
     segmentLength_sec = segmentLength/samplingFreq;
     
-    numLabelsInSeg = numSVMs*segmentLength/windowSize;
+    numLabelsInSeg = numModules*segmentLength/windowSize;
     
     if numSeizures >= 1
         
@@ -68,8 +70,8 @@ for seg = (1:numSegs)
     
     for l = (1:numLabelsInSeg)
         
-        count.tot.S = count.tot.S + theseLabels(l);
-        count.tot.N = count.tot.N + ~theseLabels(l);
+        count(seg).tot.S = count(seg).tot.S + theseLabels(l);
+        count(seg).tot.N = count(seg).tot.N + ~theseLabels(l);
         
         time_sec = 1+(l-1)*secsPerLabel + secsPerLabel/2;
         
@@ -87,18 +89,21 @@ for seg = (1:numSegs)
                         (time_sec <= seizureEnd(seiz))
                     
                     if theseLabels(l)
-                        count.good.S = count.good.S+1;
+                        count(seg).good.S = count(seg).good.S+1;
                     end
                     
                     break;
                     
                 elseif ~theseLabels(l)
-                    count.good.N = count.good.N+1;
+                    count(seg).good.N = count(seg).good.N+1;
                 end
                 
             end
             
+        elseif ~theseLabels(l)
+            count(seg).good.N = count(seg).good.N+1;
         end
+           
         
     end
     
@@ -106,19 +111,28 @@ for seg = (1:numSegs)
     
     offset = offset + numLabelsInSeg;
     
+    fprintf('   %d/%d -> %.1f%% of SEIZURE labels are correct.\n', ...
+    	count(seg).good.S, count(seg).tot.S,                        ...
+    	(100*count(seg).good.S)/count(seg).tot.S);
+        
+
+    fprintf('\n');
+    fprintf('   %d/%d -> %.1f%% of NON-SEIZURE labels are correct.\n', ...
+        count(seg).good.N, count(seg).tot.N,                           ...
+     	(100*count(seg).good.N)/count(seg).tot.N);
+    
+    fprintf('\n');
+    fprintf('   %d/%d -> %.1f%% of ALL labels are correct.\n', ...
+        count(seg).good.N+count(seg).good.S,               ...
+        count(seg).tot.N+count(seg).tot.S,                 ...
+     	(100*(count(seg).good.N+count(seg).good.S))/       ...
+        (count(seg).tot.N+count(seg).tot.S));
+    
+    fprintf('\n');
+    fprintf('\n');
 end
 
-fprintf('\n');
-fprintf('%.1f%% of seizure labels are correct.\n', ...
-        (100*count.good.S)/count.tot.S);
-fprintf('%.1f%% of seizure labels are incorrect.\n', ...
-        (100*(count.tot.S-count.good.S))/count.tot.S);
-    
-fprintf('\n');
-fprintf('%.1f%% of non-seizure labels are correct.\n', ...
-        (100*count.good.N)/count.tot.N);
-fprintf('%.1f%% of non-seizure labels are incorrect.\n', ...
-        (100*(count.tot.N-count.good.N))/count.tot.N);
+
     
 fprintf('\n');
 fprintf('Process Complete.\n');
