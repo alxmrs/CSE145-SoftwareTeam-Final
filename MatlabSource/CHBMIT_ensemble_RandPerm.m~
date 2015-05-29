@@ -14,18 +14,18 @@
 %   If set, applies a logarithm to the feature vector
 flags.log             = 1;
 
-flags.equalVectors    = 0;
+flags.equalVectors    = 1;
 
 %   The following flags are fairly self explanatory
 %   Set completed stages of a given training set/test set instantiation
 %       to 0 to prevent re-computation. Parsing files and extracting features
 %       take a particularly long time.
 
-flags.parseTrainData  = 0;
+flags.parseTrainData  = 1;
 flags.extractTrainFt  = 1;
 flags.reduceTrainFS   = 1;
 
-flags.parseTestData   = 0;
+flags.parseTestData   = 1;
 flags.extractTestFt   = 1;
 
 flags.runClassifier   = 1;
@@ -54,7 +54,7 @@ params.numFt2Rmv       = 5;     % Number of features to remove from space
 params.channel         = 'FT10T8';  % EEG channel from CHBMIT
 params.trainSegments   = [1 5]; % Bottom segment to top
 params.testSegments    = [6 7];
-params.patientNum      = 3;
+params.patientNum      = 1;
 
 fprintf('\n');
 if params.classMode == LDA
@@ -250,15 +250,10 @@ if flags.reduceTrainFS
         %   Overwrite fv_train(m).fv such that it now stores |S| N and S
         %       vectors and do the same for lv
 
+            fv_train(m).fv = [fv_train_N(m).fv; fv_train_S(m).fv];
             lv_train(m).lv = [zeros(sizes(m).S,1); ones(sizes(m).S,1)];
             
         else
-           
-            lv_train(m).lv = [zeros(sizes(m).N,1); ones(sizes(m).S,1)];
-            
-        end
-            
-        fv_train(m).fv = [fv_train_N(m).fv; fv_train_S(m).fv];
         
         %   See Classifier_findWorstFeatures for descrtion
         %   Finds worst features by plotting feature points on a 1D plane
