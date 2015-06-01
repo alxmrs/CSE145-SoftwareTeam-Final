@@ -6,13 +6,8 @@ function [output] = CHBMIT_preprocess(input, params, train)
 
 fprintf('\n');
 
-if train
-    fprintf('Preprocessing CHB-MIT training data...\n');
-    segments = params.trainSegments;
-else
-    fprintf('Preprocessing CHB-MIT test data...\n');
-    segments = params.testSegments;
-end
+fprintf('Preprocessing CHB-MIT data...\n');
+segments = params.allSegments;
 
 numRecords    = size(input,1);
 sampling_freq = params.samplingFreq;
@@ -61,7 +56,7 @@ fprintf('...\n');
 
 for i = (1:numRecords)
     fprintf('\n');
-    fprintf('  Segment %d...\n', segments(1)+i-1);
+    fprintf('  Segment %d...\n', segments(i));
     output(i,1) = Classifier_decompose(input(i),1024);
     fprintf('  Done.\n');
 end

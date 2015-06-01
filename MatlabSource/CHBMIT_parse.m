@@ -5,10 +5,7 @@ assert(nargin == 2);
 
 sampling_frequency = 256;
 
-bottomSeg = segments(1);
-topSeg    = segments(2);
-
-assert(bottomSeg <= topSeg);
+assert(nargin == 2);
 
 %%%%%%%%% READ .edf %%%%%%%%%
 
@@ -22,7 +19,7 @@ else
     path_str_10to99 = 'Data/CHBMIT/chbpnum/chbpnum_snum.edf';
 end
 
-for i = bottomSeg:topSeg
+for i = segments
 
     if i<10
         temp_str      = strrep(path_str_1to9, 'pnum', patientNum_str);
@@ -35,12 +32,12 @@ for i = bottomSeg:topSeg
 end
 
 fprintf('\n');
-fprintf('Patient %d - Segments %d to %d\n', patientNum, bottomSeg, topSeg);
+fprintf('Patient %d\n', patientNum);
 fprintf('\n');
 
 patient_data = [];
 
-for i = bottomSeg:topSeg
+for i = segments
     fprintf('Parsing segment %d\n', i);
     [hdr record] = edfread(filename(i,:));
     this.record = record;

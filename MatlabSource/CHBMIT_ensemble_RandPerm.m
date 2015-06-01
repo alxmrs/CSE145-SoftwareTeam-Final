@@ -13,21 +13,24 @@
 
 %   If set, applies a logarithm to the feature vector
 flags.log             = 1;
-
 flags.equalVectors    = 0;
+flags.augmentResults  = 1;
 
+%   CONTROL FLOW
+%
 %   The following flags are fairly self explanatory
 %   Set completed stages of a given training set/test set instantiation
 %       to 0 to prevent re-computation. Parsing files and extracting features
 %       take a particularly long time.
 
-flags.parseTrainData  = 0;
+flags.parseData       = 0;
+
 flags.extractTrainFt  = 1;
 flags.reduceTrainFS   = 1;
 
-flags.parseTestData   = 0;
 flags.extractTestFt   = 1;
 
+flags.trainClassifier = 1;
 flags.runClassifier   = 1;
 
 flags.printResults    = 1;
@@ -45,16 +48,17 @@ flags.printResults    = 1;
 LDA = 0;
 SVM = 1;
 
-params.numModules      = 1;     % The number of SVMs/LDAs
-params.windowSlide_sec = 1;     % Number of seconds in a slide
+params.numModules      = 32;    % The number of SVMs/LDAs
+params.windowSlide_sec = 2;     % Number of seconds in a slide
 params.windowSize_sec  = params.numModules*params.windowSlide_sec;
 params.samplingFreq    = 256;
 params.classMode       = SVM;
-params.numFt2Rmv       = 5;     % Number of features to remove from space
+params.numFt2Rmv       = 8;     % Number of features to remove from space
 params.channel         = 'FT10T8';  % EEG channel from CHBMIT
-params.trainSegments   = [1 5]; % Bottom segment to top
+params.allSegments     = [1 2 3 4 5 6 7];
+params.trainSegments   = [1 2 3 4 5]; % Bottom segment to top
 params.testSegments    = [6 7];
-params.patientNum      = 3;
+params.patientNum      = 1;
 
 fprintf('\n');
 if params.classMode == LDA
@@ -125,25 +129,31 @@ params.seizures = seizures;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-%   PARSE TRAINING DATA
+%   PARSE DATA
 
-if flags.parseTrainData
+if flags.parseData
     
     fprintf('\n');
-    fprintf('Parsing CHB-MIT training data...\n');
+    fprintf('Parsing CHB-MIT data...\n');
     
     %   See CHBMIT_parse file for description/run help CHBMIT_parse)
-    CHBMIT_traindata = ...
-        CHBMIT_parse(params.patientNum, params.trainSegments);
+    CHBMIT_data = ...
+        CHBMIT_parse(params.patientNum, params.allSegments);
     
     %   See CHBMIT_channel file for description/run help CHBMIT_channel)
-    CHBMIT_traindata = CHBMIT_channel(CHBMIT_traindata, params.channel);
+    CHBMIT_data = CHBMIT_channel(CHBMIT_data, params.channel);
     
     %   See CHBMIT_preprocess file for description/run help CHBMIT_parse
-    CHBMIT_traindata = ...
-        CHBMIT_preprocess(CHBMIT_traindata, params, 1);
+    CHBMIT_data = ...
+        CHBMIT_preprocess(CHBMIT_data, params);
     
 end
+
+CHBMIT_traindata = CHBMIT_data(params.trainSegments, :);
+CHBMIT_testdata  = CHBMIT_data(params.testSegments,  :);
+
+trainSegments = params.trainSegments
+testSegments  = params.testSegments
 
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -294,29 +304,6 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-%   PARSE TEST DATA
-
-if flags.parseTestData
-    
-    %   Same procedure as body of 'if flags.parseTrainData ... end'
-    
-    fprintf('\n');
-    fprintf('Parsing CHB-MIT test data...\n');
-    CHBMIT_testdata = CHBMIT_parse(params.patientNum, params.testSegments);
-    CHBMIT_testdata = CHBMIT_channel(CHBMIT_testdata, params.channel);
-    CHBMIT_testdata = ...
-        CHBMIT_preprocess(CHBMIT_testdata, params, 0);
-    
-end
-
-%
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%   ~
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
 %   EXTRACT TEST FEATURES
 
 
@@ -356,20 +343,28 @@ end
 %
 %   CLASSIFY
 
-if flags.runClassifier 
- 
-    if params.classMode == SVM
+if params.classMode == SVM
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% TRAIN
+
+    if flags.trainClassifier
         
         fprintf('\n');
         fprintf('Training SVM Classifier...\n');
 
         % Create an SVM for each of the feature/label vector pairs
         
-        for m = (1:params.numModules)
+        parfor m = (1:params.numModules)
             SVMModel(m).obj = fitcsvm(fv_train(m).fv, lv_train(m).lv);
         end
 
         fprintf('Done.\n');
+        
+    end
+        
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% CLASSIFY
+
+    if flags.runClassifier 
 
         fprintf('\n');
         fprintf('Classifying test data...\n');
@@ -377,7 +372,7 @@ if flags.runClassifier
         %Extract labels from the independant classifications
 
         for m = (1:params.numModules)
-            labels_raw(m,:) = predict(SVMModel(m).obj, fv_test(m).fv);
+            labels_raw(m,:) = predict(SVMModel(m).obj, fv_test(m).fv)';
         end
 
         %Set master label as majority vote of independant labels
@@ -386,21 +381,31 @@ if flags.runClassifier
             labels(l) = mode(labels_raw(:,l));
         end
         
-    elseif params.classMode == LDA
+    end
+        
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        
+elseif params.classMode == LDA
+    
+    if flags.trainClassifier
 
         fprintf('\n');
         fprintf('Training LDA Classifier...\n');
 
-        for m = (1:params.numModules)
+        parfor m = (1:params.numModules)
             LDAModel(m).obj = fitcdiscr(fv_train(m).fv, lv_train(m).lv);
         end
 
         fprintf('Done.\n');
 
+    end
+    
+    if flags.runClassifier
+        
         fprintf('\n');
         fprintf('Classifying test data...\n');
 
-        for m = (1:params.numModules)
+        for m = (1:params.numModules) 
             labels_raw(m,:) = predict(LDAModel(m).obj, fv_test(m).fv);
         end
 
@@ -425,6 +430,8 @@ end
 %   PRINT RESULTS
 
 if flags.printResults
-    CHBMIT_printResults(params, CHBMIT_testdata, labels, lv_test);
+    results =           ...
+        CHBMIT_results( ...
+        params, CHBMIT_testdata, labels, lv_test, flags.augmentResults);
 end
 

@@ -1,6 +1,7 @@
-function [ results ] = CHBMIT_results( params, data, labels, lv_test )
+function [ results ] = ...
+    CHBMIT_results( params, data, labels, lv_test, flags_augmentResults )
 
-assert(nargin == 4);
+assert(nargin == 5);
 
 numModules     = params.numModules;
 samplingFreq   = params.samplingFreq;
@@ -14,6 +15,7 @@ fprintf('Results...\n');
 fprintf('\n');
 
 numSegs = testSegments(2)-testSegments(1)+1;
+results = [];
 
 offset = 1;
 
@@ -25,10 +27,10 @@ for seg = (1:numSegs)
     count(seg).good.S = 0;
     count(seg).good.N = 0;
     
-    fprintf('Segment %d\n', seg+(testSegments(1)-1));
+    fprintf('Segment %d\n', testSegments(seg));
     fprintf('\n');
     
-    seizureIndex = find(seizures(:,1)==(seg+testSegments(1)-1));
+    seizureIndex = find(seizures(:,1) == testSegments(seg));
     numSeizures  = size(seizureIndex,1);
     
     segmentLength     = size(data(seg).record,2);
@@ -73,9 +75,9 @@ for seg = (1:numSegs)
         count(seg).tot.S = count(seg).tot.S + theseLabels(l);
         count(seg).tot.N = count(seg).tot.N + ~theseLabels(l);
         
-        time_sec = 1+(l-1)*secsPerLabel + secsPerLabel/2;
+        time_sec = 1+(l-1)*secsPerLabel;
             
-        if theseLabels
+        if theseLabels(l)
             detectedSeizures = ...
                 [detectedSeizures time_sec];
         end
@@ -83,10 +85,10 @@ for seg = (1:numSegs)
         if seizurePresent
             
             seizureStart = ...
-                seizures(find(seizures(:,1)==(seg+testSegments(1)-1)), 2);
+                seizures( find(seizures(:,1) == testSegments(seg)), 2);
             
             seizureEnd   = ...
-                seizures(find(seizures(:,1)==(seg+testSegments(1)-1)), 3);
+                seizures( find(seizures(:,1) == testSegments(seg)), 3);
             
             for seiz = (1:numSeizures)
                 
@@ -111,14 +113,28 @@ for seg = (1:numSegs)
            
     end
     
-    for seiz = (1:length(detectedSeizures)-1)
+    
+    seiz = 1;
+    
+    while seiz <= length(detectedSeizures)-1
         
-        if detectedSeizures(seiz+1) ~= ...
+        thisRow  = [testSegments(seg) detectedSeizures(seiz)];
+        
+        while detectedSeizures(seiz+1) == ...
                 detectedSeizures(seiz) + secsPerLabel
+        
+            seiz = seiz+1;
             
-            
-            
+            if seiz == length(detectedSeizures)
+                break;
+            end
+           
         end
+        
+        thisRow = [thisRow  detectedSeizures(seiz) + secsPerLabel];
+        results = [results; thisRow];
+        
+        seiz = seiz + 1;
         
     end
     
@@ -146,11 +162,47 @@ for seg = (1:numSegs)
         (count(seg).tot.N+count(seg).tot.S));
     
     fprintf('\n');
+end
+
+results_preAugmentation = results
+
+if flags_augmentResults
+    
     fprintf('\n');
+    fprintf('Augmenting Results...\n');
+    
+    seiz = 1;
+    
+    while seiz <= size(results,1)-1
+        
+        this_startTime = results(seiz, 2);
+        this_endTime   = results(seiz, 3);
+        
+        next_startTime = results(seiz+1, 2);
+        next_endTime   = results(seiz+1, 3);
+        
+        if next_startTime <= this_endTime + secsPerLabel*2
+            
+        	results(seiz,   3) = next_endTime;
+            results(seiz+1, :) = [];
+            
+        elseif this_endTime <= this_startTime + secsPerLabel*2
+            
+            results(seiz,:) = [];
+            
+        else
+            seiz = seiz+1;
+        end
+        
+    end
+    
+    fprintf('Done.\n');
+    results_posAugmentation = results
+    
 end
 
 
-    
+fprintf('\n');
 fprintf('\n');
 fprintf('Process Complete.\n');
 fprintf('\n');

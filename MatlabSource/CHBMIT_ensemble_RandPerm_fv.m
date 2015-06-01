@@ -60,7 +60,7 @@ end
 for seg = (1:numSegments)
     
     fprintf('Segment %d... 0%%                            100%%\n', ...
-        seg+(segments(1)-1));
+        segments(seg));
     
     fprintf('             |                              |\n');
     
