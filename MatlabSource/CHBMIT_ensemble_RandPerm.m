@@ -48,7 +48,7 @@ flags.printResults    = 1;
 LDA = 0;
 SVM = 1;
 
-params.numModules      = 32;    % The number of SVMs/LDAs
+params.numModules      = 16;    % The number of SVMs/LDAs
 params.windowSlide_sec = 2;     % Number of seconds in a slide
 params.windowSize_sec  = params.numModules*params.windowSlide_sec;
 params.samplingFreq    = 256;
