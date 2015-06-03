@@ -1,4 +1,4 @@
-function flist = Classifier_findWorstFeatures(fv_N, fv_S, num_ft2rmv, ... 
+function flist = Classifier_findWorstFeatures(fv, lv, num_ft2rmv, ... 
                                               classificationMode)
 %flist = Classifier_findWorstFeatures(fv_N, fv_S, num_ft2rmv, MLE_flag)
 %
@@ -10,8 +10,15 @@ SVM = 1;
 LDA = 0;
 MLE = 2;
 
+indices_N = find(lv == 0);
+indices_S = find(lv == 1);
+
+fv_N = fv(indices_N, :);
+fv_S = fv(indices_S, :);
+
 flist        = [];
 num_features = size(fv_N,2);
+        
 
 if ((nargin == 3) || (classificationMode == SVM))
 

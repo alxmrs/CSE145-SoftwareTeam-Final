@@ -13,8 +13,9 @@
 
 %   If set, applies a logarithm to the feature vector
 flags.log             = 1;
-flags.equalVectors    = 0;
 flags.augmentResults  = 1;
+flags.randperm        = 1;
+flags.hierarchy       = 0;
 
 %   CONTROL FLOW
 %
@@ -53,10 +54,8 @@ params.numModules      = 16;    % The number of SVMs/LDAs
 params.classMode       = SVM;
 params.numFt2Rmv       = 8;     % Number of features to remove from space
 
-params.randperm        = 1;
-
 params.windowSlide_sec = 1;
-params.windowSize_sec  = 4;
+params.windowSize_sec  = 1;
 
 params.patientNum      = 1;
 params.minutesToSend   = 20;
@@ -64,13 +63,20 @@ params.minutesToSend   = 20;
 params.channel         = 'FT10T8';  % EEG channel from CHBMIT
 params.samplingFreq    = 256;
 
-params.allSegments     = [1 2 3 4 5 6 7];
-params.trainSegments   = [1 2 3]; % Bottom segment to top
-params.testSegments    = [4 5 6 7];
+params.flags           = flags;
 
+params.allSegments     = [1 2 3 4 5 6 7];
+params.trainSegments   = [1 2 3 4];
+params.testSegments    = [5 6 7];
+
+if params.flags.hierarchy
+    
+    params.trainSegments_A = params.trainSegments(1:2); 
+    params.trainSegments_B = params.trainSegments(3:4); 
+end
 
 fprintf('\n');
-if params.randperm 
+if params.flags.randperm 
     fprintf('Classification mode: %d-SVM Ensemble', params.numModules);
     fprintf(' using randomly permuted windows\n');
 else
@@ -86,39 +92,6 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %   READ SEIZURE DATA
-
-%   Read the seizure matrix:
-%       col 1: segment number of segment with seizure present
-%       col 2: start time of seizure in seconds
-%       col 3: end time of seizure in seconds
-%
-%	 NB (Very important):
-%     	Some CHBMIT example files are not consecutive in numbering
-%       You will need to re-number them
-%       I recommend using patient one (chb01) with the following numbering:
-%
-%     chb01:
-%     3  	-> 1
-%     4  	-> 2
-%     15 	-> 3
-%     16	-> 4
-%     18	-> 5
-%     21	-> 6
-%     26	-> 7
-%
-%       These are the segments with seizures in them. The corresponding
-%       .csv file is...
-%
-%     1, 2996, 3036
-%     2, 1467, 1494
-%     3, 1732, 1772
-%     4, 1015, 1066
-%     5, 1720, 1810
-%     6, 327, 420
-%     7, 1862, 1963
-%
-%       You will of course need to rename the files as to correspond with
-%       the above mapping!
 
 seizStr_1to9   = 'Data/CHBMIT/chb0pnum/seizures.csv';
 seizStr_10to99 = 'Data/CHBMIT/chbpnum/seizures.csv';
@@ -142,7 +115,7 @@ params.seizures = seizures;
 %
 %   PARSE DATA
 
-if flags.parseData
+if params.flags.parseData
     
     fprintf('\n');
     fprintf('Parsing CHB-MIT data...\n');
@@ -153,20 +126,27 @@ if flags.parseData
     
     %   See CHBMIT_channel file for description/run help CHBMIT_channel)
     CHBMIT_data_raw = CHBMIT_channel(CHBMIT_data_raw, params.channel);
+    
 end
 
-if flags.preprocessData
+if params.flags.preprocessData
     %   See CHBMIT_preprocess file for description/run help CHBMIT_parse
     CHBMIT_data_preprocessed = ...
         CHBMIT_preprocess(CHBMIT_data_raw, params);
     
 end
 
-CHBMIT_traindata = CHBMIT_data_preprocessed(params.trainSegments, :);
-CHBMIT_testdata  = CHBMIT_data_preprocessed(params.testSegments,  :);
+if params.flags.hierarchy
+    CHBMIT_traindata_A = ...
+        CHBMIT_data_preprocessed(params.trainSegments_A, :);
+    
+    CHBMIT_traindata_B = ...
+        CHBMIT_data_preprocessed(params.trainSegments_B, :);
+else
+    CHBMIT_traindata = CHBMIT_data_preprocessed(params.trainSegments, :);
+end
 
-trainSegments = params.trainSegments
-testSegments  = params.testSegments
+CHBMIT_testdata  = CHBMIT_data_preprocessed(params.testSegments, :);
 
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -177,43 +157,25 @@ testSegments  = params.testSegments
 %
 %   EXTRACT TRAINING FEATURES
                     
-if flags.extractTrainFt
-
-    %  See CHBMIT_ensemble_RandPerm_fv file for description
-    %      .../run help CHBMIT_ensemble_RandPerm_fv
+if params.flags.extractTrainFt
     
-    %  This function basically returns a feature vector and label vector
-    %      for the training set
-    %
-    %  The structs are accessed as:
-    %      fv_train(moduleNumber).fv => FEATURE_VECTOR
-    %      lv_train(moduleNumber).lv => LABEL_VECTOR
-    %
-    %  Due to the way in which the Modules receive randomly permuted
-    %      data for a given window, the label vectors may not necessarily
-    %      be the same.
-    %
-    %  For example: [0 0 0 0 1 1 1 1 1 1]
-    %                  |             | <- Window_Size = 8, iteration 2
-    %
-    %  Let's say that the permutation is [4 2 5 3 6 7 8 1]
-    %      ...and that we have 8 modules
-    %      ...and we are at the second iteration (one window_slide passed)
-    %
-    %      lv_train(1).lv(2) = 1
-    %      lv_train(2).lv(2) = 0
-    %      lv_train(3).lv(2) = 1
-    %      lv_train(4).lv(2) = 0
-    %      lv_train(5).lv(2) = 1
-    %      lv_train(6).lv(2) = 1
-    %      lv_train(7).lv(2) = 1
-    %      lv_train(8).lv(2) = 0
-     
-    [fv_train lv_train] =                        ...
+    if params.flags.hierarchy
+        
+        [fv_trainA lv_trainA] =         ...
     	CHBMIT_ensemble_fv(             ...
-        params, CHBMIT_traindata, flags.log, 1);
+        params, CHBMIT_traindata_A, 1);
     
+        [fv_trainB_raw lv_trainB] =         ...
+    	CHBMIT_ensemble_fv(             ...
+        params, CHBMIT_traindata_B, 2);
     
+    else
+        
+        [fv_train lv_train] =               ...
+            CHBMIT_ensemble_fv(             ...
+            params, CHBMIT_traindata, 1);
+
+    end
     
 end
 
@@ -226,87 +188,44 @@ end
 %
 %   REDUCE TRAINING FEATURE SPACE
 
-if flags.reduceTrainFS
+if params.flags.reduceTrainFS
    
     fprintf('\n');
     fprintf('Reducing feature space of training set by %d...\n', ...
         params.numFt2Rmv);
-    fprintf('\n');
     
-    %   Each modules may have a different list of features to remove
-    %       ...That being said, the lists will mostly be similar
-    %       ...The inclusion of a list for each module is to remove bias
+    fprintf('\n');
     
     flist = zeros(params.numModules, params.numFt2Rmv);
     
-    %   For each module...
     for m = (1:params.numModules)
         
         fprintf('    Module %d...', m);
         
-        %   Find indices in label vector of (non-)seizure features (0,1
-        %   resp.)
-        indices(m).N = find(lv_train(m).lv == 0);
-        indices(m).S = find(lv_train(m).lv == 1);
-        
-        %   Extract the feature vectors into seperate matrices
-        fv_train_N(m).fv = fv_train(m).fv(indices(m).N, :);
-        fv_train_S(m).fv = fv_train(m).fv(indices(m).S, :);
-        
-        %   Store number of features within (non-)seizure sets
-        sizes(m).S = size(indices(m).S, 1);
-        sizes(m).N = size(indices(m).N, 1);
-        
-        %   Create a random permuation for each module
-        %
-        %   Why?
-        %       Their are generally more non-seizure (N) feature vectors
-        %           than seizure (S) feature vectors.
-        %       We want to make the feature vectors the same size so that
-        %           each module gets the same info about N as S
-        %       To reduce the number of N feature vectors we randomly
-        %           select |S| feature vectors. 
-        %       I randomly select by randomly permuting and then taking the
-        %           first |S| vectors of the permuted N data
-        
-        if flags.equalVectors
-        
-            rp(m).N          = randperm(sizes(m).N);
-            fv_train_N(m).fv = fv_train_N(m).fv(rp(m).N,:);
-            fv_train_N(m).fv = fv_train_N(m).fv(1:sizes(m).S,:);
-        
-        %   Overwrite fv_train(m).fv such that it now stores |S| N and S
-        %       vectors and do the same for lv
+        if params.flags.hierarchy
+            
+            flist(m,:) = ...
+                Classifier_findWorstFeatures(           ...
+                fv_trainA(m).fv, lv_trainA(m).lv, ...
+                params.numFt2Rmv, params.classMode);
 
-            lv_train(m).lv = [zeros(sizes(m).S,1); ones(sizes(m).S,1)];
+            fv_trainA(m).fv = ...
+                Classifier_removeFeatures(fv_trainA(m).fv, flist(m,:));
+            
+            fv_trainB(m).fv = ...
+                Classifier_removeFeatures(fv_trainB_raw, flist(m,:));
             
         else
-           
-            lv_train(m).lv = [zeros(sizes(m).N,1); ones(sizes(m).S,1)];
-            
+        
+            flist(m,:) =                        ...
+                Classifier_findWorstFeatures(   ...
+                fv_train(m).fv, lv_train(m).lv, ...
+                params.numFt2Rmv, params.classMode);
+
+            fv_train(m).fv = ...
+                Classifier_removeFeatures(fv_train(m).fv, flist(m,:));
+        
         end
-            
-        fv_train(m).fv = [fv_train_N(m).fv; fv_train_S(m).fv];
-        
-        %   See Classifier_findWorstFeatures for descrtion
-        %   Finds worst features by plotting feature points on a 1D plane
-        %       and finding features that produce the worst seperation
-        %   The method of determining seperation depends on the
-        %       classification mode
-        %
-        %   If SVM: Use simple decision boundary and find num of outliers
-        %   If LDA: Create Gaussian distributions. Find probabilities of
-        %       points falling within each dist.
-        
-        flist(m,:) = ...
-            Classifier_findWorstFeatures(           ...
-            fv_train_N(m).fv, fv_train_S(m).fv, ...
-            params.numFt2Rmv, params.classMode);
-        
-        %   Remove the features
-        
-        fv_train(m).fv = ...
-            Classifier_removeFeatures(fv_train(m).fv, flist(m,:));
         
         fprintf(' Done.\n', m);
         
@@ -327,13 +246,10 @@ end
 %
 %   EXTRACT TEST FEATURES
 
-
-if flags.extractTestFt
-
-    %As explained in 'if flags.extractTestFt ... end'
+if params.flags.extractTestFt
     
     [fv_test_raw lv_test] =              ...
-    	CHBMIT_ensemble_fv(params, CHBMIT_testdata, flags.log, 0);
+    	CHBMIT_ensemble_fv(params, CHBMIT_testdata, 0);
     
     fprintf('\n');
     fprintf('Reducing feature space of test set by %d...\n', ...
@@ -344,10 +260,57 @@ if flags.extractTestFt
         fv_test(m).fv = ...
             Classifier_removeFeatures(fv_test_raw, flist(m,:));
         
-%         if min(size(find(var(fv_test(m).fv) == 0))) > 0
-%             m
-%             find(var(fv_test(m).fv) == 0)
-%         end
+    end
+    
+    fprintf('Done.\n');
+    
+end
+
+%
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%   ~
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%   TRAIN
+
+labels_raw = [];
+labelsB    = [];
+
+if params.flags.trainClassifier
+    
+    fprintf('\n');
+    fprintf('Training SVM Classifier...\n');
+    
+    % Create an SVM for each of the feature/label vector pairs
+    
+    if params.flags.hierarchy
+        
+        parfor m = (1:params.numModules)
+            
+            SVMModel_layer1(m).obj = ...
+                fitcsvm(fv_trainA(m).fv, lv_trainA(m).lv);
+            
+        end
+        
+        for m = (1:params.numModules)
+            
+            labelsB(:,m)    = ...
+                predict(SVMModel_layer1(m).obj, fv_trainB(m).fv);
+        
+        end  
+        
+        SVMModel_master = fitcsvm(labelsB, lv_trainB);
+        
+    else
+        
+        parfor m = (1:params.numModules)
+            SVMModel(m).obj = ...
+                fitcsvm(fv_train(m).fv, lv_train(m).lv);
+        end
+        
     end
     
     fprintf('Done.\n');
@@ -364,83 +327,39 @@ end
 %
 %   CLASSIFY
 
-labels_raw = [];
-
-if params.classMode == SVM
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% TRAIN
-
-    if flags.trainClassifier
+if params.flags.runClassifier
+    
+    fprintf('\n');
+    fprintf('Classifying test data...\n');
+    
+    %Extract labels from the independant classifications
+    
+    if params.flags.hierarchy
         
-        fprintf('\n');
-        fprintf('Training SVM Classifier...\n');
-
-        % Create an SVM for each of the feature/label vector pairs
-        
-        parfor m = (1:params.numModules)
-            SVMModel(m).obj = fitcsvm(fv_train(m).fv, lv_train(m).lv);
+        for m = (1:params.numModules)
+            labels_raw(:,m) = ...
+                predict(SVMModel_layer1(m).obj, fv_test(m).fv);
         end
-
-        fprintf('Done.\n');
         
-    end
+        labels = predict(SVMModel_master, labels_raw);
         
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% CLASSIFY
-
-
-    if flags.runClassifier 
-
-        fprintf('\n');
-        fprintf('Classifying test data...\n');
-        
-        %Extract labels from the independant classifications
-
-        
-        parfor m = (1:params.numModules)
-            labels_raw(m,:) = predict(SVMModel(m).obj, fv_test(m).fv)';
+    else
+    
+        for m = (1:params.numModules)
+            labels_raw(:,m) = predict(SVMModel(m).obj, fv_test(m).fv);
         end
 
         %Set master label as majority vote of independant labels
-        
-        for l = (1:size(labels_raw,2))
-            labels(l) = mode(labels_raw(:,l));
+
+        if params.numModules > 1
+            for l = size(labels_raw,1)
+                labels(l) = mode(labels_raw(l,:));
+            end
+        else
+            labels = labels_raw;
         end
         
     end
-        
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        
-elseif params.classMode == LDA
-    
-    if flags.trainClassifier
-
-        fprintf('\n');
-        fprintf('Training LDA Classifier...\n');
-
-        parfor m = (1:params.numModules)
-            LDAModel(m).obj = fitcdiscr(fv_train(m).fv, lv_train(m).lv);
-        end
-
-        fprintf('Done.\n');
-
-    end
-    
-    if flags.runClassifier
-        
-        fprintf('\n');
-        fprintf('Classifying test data...\n');
-
-        for m = (1:params.numModules)
-            labels_raw(m,:) = predict(LDAModel(m).obj, fv_test(m).fv);
-        end
-
-        for l = (1:size(labels_raw,2))
-            labels(l) = mode(labels_raw(:,l));
-        end
-        
-    end
-        
-    fprintf('Done.\n');
     
 end
 
@@ -454,10 +373,11 @@ end
 %
 %   PRINT RESULTS
 
-if flags.printResults
+if params.flags.printResults
     results =                   ...
         CHBMIT_ensembleResults( ...
-        params, CHBMIT_testdata, labels, lv_test, flags.augmentResults);
+        params, CHBMIT_data_preprocessed, ...
+        labels, lv_test);
 end
 
 %
@@ -470,7 +390,7 @@ end
 %
 %   SEND DATA
 
-if flags.sendData
+if params.flags.sendData
     
     secondsToSend = 60*params.minutesToSend;
     

@@ -1,8 +1,10 @@
 function [ results ] =      ...
     CHBMIT_ensembleResults( ...
-    params, data, labels, lv_test, flags_augmentResults)
+    params, data, labels, lv_test)
 
-assert(nargin == 5);
+assert(nargin == 4);
+
+flags_augmentResults = params.flags.augmentResults;
 
 numModules     = params.numModules;
 samplingFreq   = params.samplingFreq;
@@ -23,7 +25,7 @@ results = [];
 
 offset = 1;
 
-for seg = (1:numSegs)
+for seg = testSegments
     
     count(seg).tot.S  = 0;
     count(seg).tot.N  = 0;
@@ -31,10 +33,10 @@ for seg = (1:numSegs)
     count(seg).good.S = 0;
     count(seg).good.N = 0;
     
-    fprintf('Segment %d\n', testSegments(seg));
+    fprintf('Segment %d\n', seg);
     fprintf('\n');
     
-    seizureIndex = find(seizures(:,1) == testSegments(seg));
+    seizureIndex = find(seizures(:,1) == seg);
     numSeizures  = size(seizureIndex,1);
     
     segmentLength     = size(data(seg).record,2);
@@ -89,10 +91,10 @@ for seg = (1:numSegs)
         if seizurePresent
             
             seizureStart = ...
-                seizures( find(seizures(:,1) == testSegments(seg)), 2);
+                seizures( find(seizures(:,1) == seg), 2);
             
             seizureEnd   = ...
-                seizures( find(seizures(:,1) == testSegments(seg)), 3);
+                seizures( find(seizures(:,1) == seg), 3);
             
             for seiz = (1:numSeizures)
                 
@@ -122,7 +124,7 @@ for seg = (1:numSegs)
     
     while seiz <= length(detectedSeizures)-1
         
-        thisRow  = [testSegments(seg) detectedSeizures(seiz)];
+        thisRow  = [seg detectedSeizures(seiz)];
         
         while detectedSeizures(seiz+1) == ...
                 detectedSeizures(seiz) + secsPerLabel

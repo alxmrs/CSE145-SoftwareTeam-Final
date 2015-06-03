@@ -1,33 +1,54 @@
 function [fv, lv] = ...
-    CHBMIT_ensemble_fv(params, input, flag_log, train)
+    CHBMIT_ensemble_fv(params, input, train)
 %[fv, lv] = CHBMIT_ensemble_RandPerm_fv(params, input, flag_log, train)
 
-assert(nargin == 4);
+assert(nargin == 3);
 
+flag_log        = params.flags.log;
 samplingFreq    = params.samplingFreq;
 windowSize_sec  = params.windowSize_sec;
 windowSlide_sec = params.windowSlide_sec;
 numModules      = params.numModules;
 seizures        = params.seizures;
-RP              = params.randperm;
+RP              = params.flags.randperm;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-if train
     
-    fprintf('\n');
-    fprintf('Extracting training set features...\n');
-    fprintf('\n');
-    
-    segments = params.trainSegments;
-    
-else
+if train == 0
     
     fprintf('\n');
     fprintf('Extracting test set features...\n');
     fprintf('\n');
     
     segments = params.testSegments;
+    
+elseif params.flags.hierarchy
+    
+    if train == 1
+
+        fprintf('\n');
+        fprintf('Extracting training set A features...\n');
+        fprintf('\n');
+
+        segments = params.trainSegments_A;
+        
+    elseif train == 2
+        
+        fprintf('\n');
+        fprintf('Extracting training set B features...\n');
+        fprintf('\n');
+
+        segments = params.trainSegments_B;
+        
+    end
+    
+elseif train == 1
+    
+    fprintf('\n');
+    fprintf('Extracting training set features...\n');
+    fprintf('\n');
+    
+    segments = params.trainSegments;
     
 end
 
@@ -65,16 +86,17 @@ for seg = (1:numSegments)
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         
-    seizIndex   = find(seizures(:,1) == seg);
+    seizIndex   = find(seizures(:,1) == segments(seg));
     numSeizures = length(seizIndex);
     
-    seizurePresent = 0;
-    if numSeizures >= 1
-        seizurePresent = 1;
+    if numSeizures
+        
         seizureStarts((1:numSeizures)) = ...
             seizures(seizIndex((1:numSeizures)),2);
+        
         seizureEnds((1:numSeizures)) = ...
             seizures(seizIndex((1:numSeizures)),3);
+        
     end
     
     fprintf('             ');
@@ -107,14 +129,14 @@ for seg = (1:numSegments)
         time_sec = 1+(subseg-1)*windowSlide_sec + windowSize_sec/2;
 
         thisLabel = 0;
-        if seizurePresent
-            for seiz = (1:numSeizures)
-                if (time_sec >= seizureStarts(seiz)) && ...
-                        (time_sec <= seizureEnds(seiz))
-                    thisLabel = 1;
-                end
-            end
+        
+        for seiz = (1:numSeizures)
+           	if (time_sec >= seizureStarts(seiz)) && ...
+                	(time_sec <= seizureEnds(seiz))
+            	thisLabel = 1;
+        	end
         end
+        
      	lv_raw = [lv_raw; thisLabel];
         
     end
@@ -123,7 +145,7 @@ for seg = (1:numSegments)
     
 end
 
-if train
+if train == 1
 
     if RP
         

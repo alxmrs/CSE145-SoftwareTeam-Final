@@ -194,7 +194,9 @@ if flags_augmentResults
         next_startTime = results(seiz+1, 2);
         next_endTime   = results(seiz+1, 3);
         
-        if next_startTime <= this_endTime + 5*secsPerLabel
+        sameSeg = ((results(seiz+1), 1) == (results(seiz), 1));
+        
+        if sameSeg && (next_startTime <= this_endTime + 5*secsPerLabel)
             
         	results(seiz,   3) = next_endTime;
             results(seiz+1, :) = [];
