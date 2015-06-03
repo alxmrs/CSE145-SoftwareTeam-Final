@@ -1,4 +1,4 @@
-%%%%%% CHB-MIT Ensemble RAND PERM %%%%%%
+%%%%%% CHB-MIT Ensemble %%%%%%
 
 %
 %   This file is the master script for the bagged SVM/LDA classifier with
@@ -24,6 +24,7 @@ flags.augmentResults  = 1;
 %       take a particularly long time.
 
 flags.parseData       = 0;
+flags.preprocessData  = 0;
 
 flags.extractTrainFt  = 1;
 flags.reduceTrainFS   = 1;
@@ -34,6 +35,7 @@ flags.trainClassifier = 1;
 flags.runClassifier   = 1;
 
 flags.printResults    = 1;
+flags.sendData        = 0;
 
 %
 %
@@ -45,26 +47,35 @@ flags.printResults    = 1;
 %
 %   SET PARAMETERS
 
-LDA = 0;
 SVM = 1;
 
 params.numModules      = 16;    % The number of SVMs/LDAs
-params.windowSlide_sec = 2;     % Number of seconds in a slide
-params.windowSize_sec  = params.numModules*params.windowSlide_sec;
-params.samplingFreq    = 256;
 params.classMode       = SVM;
 params.numFt2Rmv       = 8;     % Number of features to remove from space
-params.channel         = 'FT10T8';  % EEG channel from CHBMIT
-params.allSegments     = [1 2 3 4 5 6 7];
-params.trainSegments   = [1 2 3 4 5]; % Bottom segment to top
-params.testSegments    = [6 7];
+
+params.randperm        = 1;
+
+params.windowSlide_sec = 1;
+params.windowSize_sec  = 4;
+
 params.patientNum      = 1;
+params.minutesToSend   = 20;
+
+params.channel         = 'FT10T8';  % EEG channel from CHBMIT
+params.samplingFreq    = 256;
+
+params.allSegments     = [1 2 3 4 5 6 7];
+params.trainSegments   = [1 2 3]; % Bottom segment to top
+params.testSegments    = [4 5 6 7];
+
 
 fprintf('\n');
-if params.classMode == LDA
-    fprintf('Classification mode: %d-LDA Ensemble\n', params.numModules);
-elseif params.classMode == SVM
-    fprintf('Classification mode: %d-SVM Ensemble\n', params.numModules);
+if params.randperm 
+    fprintf('Classification mode: %d-SVM Ensemble', params.numModules);
+    fprintf(' using randomly permuted windows\n');
+else
+    fprintf('Classification mode: %d-SVM Ensemble', params.numModules);
+    fprintf(' using bagging\n');
 end
 
 %
@@ -137,20 +148,22 @@ if flags.parseData
     fprintf('Parsing CHB-MIT data...\n');
     
     %   See CHBMIT_parse file for description/run help CHBMIT_parse)
-    CHBMIT_data = ...
+    CHBMIT_data_raw = ...
         CHBMIT_parse(params.patientNum, params.allSegments);
     
     %   See CHBMIT_channel file for description/run help CHBMIT_channel)
-    CHBMIT_data = CHBMIT_channel(CHBMIT_data, params.channel);
-    
+    CHBMIT_data_raw = CHBMIT_channel(CHBMIT_data_raw, params.channel);
+end
+
+if flags.preprocessData
     %   See CHBMIT_preprocess file for description/run help CHBMIT_parse
-    CHBMIT_data = ...
-        CHBMIT_preprocess(CHBMIT_data, params);
+    CHBMIT_data_preprocessed = ...
+        CHBMIT_preprocess(CHBMIT_data_raw, params);
     
 end
 
-CHBMIT_traindata = CHBMIT_data(params.trainSegments, :);
-CHBMIT_testdata  = CHBMIT_data(params.testSegments,  :);
+CHBMIT_traindata = CHBMIT_data_preprocessed(params.trainSegments, :);
+CHBMIT_testdata  = CHBMIT_data_preprocessed(params.testSegments,  :);
 
 trainSegments = params.trainSegments
 testSegments  = params.testSegments
@@ -196,9 +209,11 @@ if flags.extractTrainFt
     %      lv_train(7).lv(2) = 1
     %      lv_train(8).lv(2) = 0
      
-    [fv_train lv_train] =            ...
-    	CHBMIT_ensemble_RandPerm_fv( ...
+    [fv_train lv_train] =                        ...
+    	CHBMIT_ensemble_fv(             ...
         params, CHBMIT_traindata, flags.log, 1);
+    
+    
     
 end
 
@@ -216,6 +231,7 @@ if flags.reduceTrainFS
     fprintf('\n');
     fprintf('Reducing feature space of training set by %d...\n', ...
         params.numFt2Rmv);
+    fprintf('\n');
     
     %   Each modules may have a different list of features to remove
     %       ...That being said, the lists will mostly be similar
@@ -225,6 +241,8 @@ if flags.reduceTrainFS
     
     %   For each module...
     for m = (1:params.numModules)
+        
+        fprintf('    Module %d...', m);
         
         %   Find indices in label vector of (non-)seizure features (0,1
         %   resp.)
@@ -290,8 +308,11 @@ if flags.reduceTrainFS
         fv_train(m).fv = ...
             Classifier_removeFeatures(fv_train(m).fv, flist(m,:));
         
+        fprintf(' Done.\n', m);
+        
     end
     
+    fprintf('\n');
     fprintf('Done.\n');
 
 end
@@ -312,7 +333,7 @@ if flags.extractTestFt
     %As explained in 'if flags.extractTestFt ... end'
     
     [fv_test_raw lv_test] =              ...
-    	CHBMIT_ensemble_RandPerm_fv(params, CHBMIT_testdata, flags.log, 0);
+    	CHBMIT_ensemble_fv(params, CHBMIT_testdata, flags.log, 0);
     
     fprintf('\n');
     fprintf('Reducing feature space of test set by %d...\n', ...
@@ -343,6 +364,8 @@ end
 %
 %   CLASSIFY
 
+labels_raw = [];
+
 if params.classMode == SVM
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% TRAIN
@@ -364,6 +387,7 @@ if params.classMode == SVM
         
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% CLASSIFY
 
+
     if flags.runClassifier 
 
         fprintf('\n');
@@ -371,7 +395,8 @@ if params.classMode == SVM
         
         %Extract labels from the independant classifications
 
-        for m = (1:params.numModules)
+        
+        parfor m = (1:params.numModules)
             labels_raw(m,:) = predict(SVMModel(m).obj, fv_test(m).fv)';
         end
 
@@ -405,7 +430,7 @@ elseif params.classMode == LDA
         fprintf('\n');
         fprintf('Classifying test data...\n');
 
-        for m = (1:params.numModules) 
+        for m = (1:params.numModules)
             labels_raw(m,:) = predict(LDAModel(m).obj, fv_test(m).fv);
         end
 
@@ -430,8 +455,56 @@ end
 %   PRINT RESULTS
 
 if flags.printResults
-    results =           ...
-        CHBMIT_results( ...
+    results =                   ...
+        CHBMIT_ensembleResults( ...
         params, CHBMIT_testdata, labels, lv_test, flags.augmentResults);
 end
 
+%
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%   ~
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%   SEND DATA
+
+if flags.sendData
+    
+    secondsToSend = 60*params.minutesToSend;
+    
+    for seiz = 1:size(results,1)
+        
+        segNum         = results(seiz,1);
+        startTime_seiz = results(seiz,2);
+        endTime_seiz   = results(seiz,3);
+        startTime_send = startTime_seiz - secondsToSend;
+        
+        seizureData = ...
+            CHBMIT_data_raw(segNum).record(:,startTime_seiz:endTime_seiz);
+        
+        if startTime_send <= 0
+            
+            preseizureData = ...
+                CHBMIT_data_raw(segNum-1).record(:,end+startTime_send:end);
+            
+            preseizureData = [preseizureData ...
+                CHBMIT_data_raw(segNum).record(:,1:startTime_seiz-1)];
+            
+        else
+        
+            preseizureData = ...
+                CHBMIT_data_raw(segNum).record(:, ...
+                startTime_send:startTime_seiz-1);
+            
+        end
+        
+        metaData.patientNum = params.patientNum;
+        metaData.channel    = params.channel;
+        
+        CHBMIT_sendData([preseizureData, seizureData], metaData);
+        
+    end
+    
+end

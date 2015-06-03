@@ -23,7 +23,7 @@ if ((nargin == 3) || (classificationMode == SVM))
         max_N = max(fvals_N);
         max_S = max(fvals_S);
         min_N = min(fvals_N);
-        min_S = min(fvals_N);
+        min_S = min(fvals_S);
 
         badCount(i) = (sum(fvals_N < max_S) - sum(fvals_N < min_S)) + ...
                       (sum(fvals_S < max_N) - sum(fvals_S < min_N));

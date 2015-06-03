@@ -1,7 +1,8 @@
-function [ results ] = ...
-    CHBMIT_results( params, data, labels, lv_test, flags_augmentResults, bag )
+function [ results ] =      ...
+    CHBMIT_ensembleResults( ...
+    params, data, labels, lv_test, flags_augmentResults)
 
-assert(nargin >= 5);
+assert(nargin == 5);
 
 numModules     = params.numModules;
 samplingFreq   = params.samplingFreq;
@@ -10,25 +11,20 @@ windowSlide    = params.windowSlide_sec*samplingFreq;
 testSegments   = params.testSegments;
 seizures       = params.seizures;
 
-if nargin == 5
-    bag = 0;
-end
 
-secsPerLabel   = params.windowSlide_sec;
+secsPerLabel = params.windowSlide_sec;
 
 fprintf('\n');
 fprintf('Results...\n');
 fprintf('\n');
 
-testSegments(1)
-testSegments(2)
-
-numSegs = testSegments(2)-testSegments(1)+1;
+numSegs = testSegments(end)-testSegments(1)+1;
 results = [];
 
 offset = 1;
 
 for seg = (1:numSegs)
+    
     count(seg).tot.S  = 0;
     count(seg).tot.N  = 0;
 
@@ -44,12 +40,7 @@ for seg = (1:numSegs)
     segmentLength     = size(data(seg).record,2);
     segmentLength_sec = segmentLength/samplingFreq;
     
-    if bag
-        numLabelsInSeg = segmentLength/windowSize;
-        
-    else
-        numLabelsInSeg = numModules*segmentLength/windowSize;
-    end
+    numLabelsInSeg = segmentLength/windowSlide - windowSize/windowSlide +1;
     
     if numSeizures >= 1
         
@@ -198,6 +189,8 @@ if flags_augmentResults
             
         	results(seiz,   3) = next_endTime;
             results(seiz+1, :) = [];
+            
+            seiz = seiz+1;
             
         elseif this_endTime <= this_startTime + secsPerLabel*2
             
