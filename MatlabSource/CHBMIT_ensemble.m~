@@ -5,7 +5,12 @@
 %   randomly permuted training data
 %
 
-clearvars labels_raw labels
+clearvars -except            ...
+    CHBMIT_data_preprocessed ...
+    CHBMIT_data_raw          ...
+    CHBMIT_testdata          ...
+    CHBMIT_traindata         ...
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -25,7 +30,7 @@ flags.distributeFt    = 1;
 
 flags.reduceTrainFS   = 1;
 
-flags.extractTestFt   = 1;
+flags.extractTestFt   = 0;
 
 flags.trainClassifier = 1;
 flags.runClassifier   = 1;
@@ -45,7 +50,7 @@ flags.sendData        = 0;
 
 SVM = 1;
 
-params.numModules      = 15;    % The number of SVMs/LDAs
+params.numModules      = 16;    % The number of SVMs/LDAs
 params.classMode       = SVM;
 
 params.numFt2Rmv       = 20;    % Number of features to remove from space
@@ -65,8 +70,8 @@ params.samplingFreq    = 256;
 params.flags           = flags;
 
 params.allSegments     = [1 2 3 4 5 6 7];
-params.trainSegments   = [1 2 3 4];
-params.testSegments    = [5 6 7];
+params.trainSegments   = [1 2 3 4 5];
+params.testSegments    = [6 7];
 
 if params.flags.hierarchy
     
@@ -368,7 +373,7 @@ if params.flags.runClassifier
         %Set master label as majority vote of independant labels
 
         if params.numModules > 1
-            for l = 1:size(labels_raw,1)
+            for l = size(labels_raw,1)
                 labels(l) = mode(labels_raw(l,:));
             end
         else
@@ -444,17 +449,3 @@ if params.flags.sendData
     end
     
 end
-
-
-
-
-
-clearvars -except            ...
-    CHBMIT_data_preprocessed ...
-    CHBMIT_data_raw          ...
-    CHBMIT_testdata          ...
-    CHBMIT_traindata         ...
-    fv_raw lv_raw            ...
-    labels labels_raw
-    
-            

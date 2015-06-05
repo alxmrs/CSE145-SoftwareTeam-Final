@@ -1,4 +1,4 @@
-function [fv, lv] = ...
+function [fv_raw, lv_raw] = ...
     CHBMIT_ensemble_fv(params, input, train)
 %[fv, lv] = CHBMIT_ensemble_RandPerm_fv(params, input, flag_log, train)
 
@@ -119,9 +119,6 @@ for seg = (1:numSegments)
       	offset = 1+(subseg-1)*windowSlide;
       	thisSubSegment = ...
            	thisSegment(:,offset:offset+windowSize-1);
-            
-     	fv_raw = ...
-            [fv_raw; Classifier_getFeatures(thisSubSegment, flag_log)];
         
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
         
@@ -137,76 +134,13 @@ for seg = (1:numSegments)
         	end
         end
         
-     	lv_raw = [lv_raw; thisLabel];
+        lv_raw = [lv_raw; thisLabel];
+        fv_raw = [fv_raw; Classifier_getFeatures(thisSubSegment, flag_log)];
         
     end
     
     fprintf('\n\n');
     
 end
-
-if train == 1
-
-    if RP
-        
-        numLabels = length(lv_raw);
-        
-        fprintf('Assigning random permutations of window to SVMs...\n');
-        fprintf('\n');
-        
-        for l = (1:numLabels-numModules+1)
-           
-            thisRP = randperm(numModules);
-            thisFV = fv_raw(l:l+numModules-1,:);
-            thisLV = lv_raw(l:l+numModules-1,1);
-            
-            for m = (1:numModules)
-               
-                lv(m).lv(l,1) = thisLV(thisRP(m),1);
-                fv(m).fv(l,:) = thisFV(thisRP(m),:);
-                
-            end
-            
-        end
-        
-        fprintf(' Done\n');
-        
-    else
-    
-        numLabels = length(lv_raw);
-
-        fprintf('Randomly sampling F-L vector pairs by module...\n');
-        fprintf('\n');
-
-        for m = (1:numModules)
-
-            fprintf('    Module %d...', m);
-
-            fv(m).fv = [];
-            lv(m).lv = [];
-
-            for l = (1:numLabels)
-
-                thisRand      = randi(numLabels); 
-                lv(m).lv(l,1) = lv_raw(thisRand,1);
-                fv(m).fv(l,:) = fv_raw(thisRand,:);
-
-            end
-
-            fprintf(' Done\n');
-
-        end
-        
-    end
-    
-else
-    
-    fv = fv_raw;
-    lv = lv_raw;
-    
-end
-
-fprintf('\n');
-fprintf('Done.\n');
 
 end
