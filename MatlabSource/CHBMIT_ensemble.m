@@ -15,12 +15,13 @@ flags.log             = 1;
 flags.augmentResults  = 1;
 flags.randperm        = 0;
 flags.hierarchy       = 0;
+flags.unanimous       = 0;
 
 %   CONTROL FLOW
 flags.parseData       = 0;
 flags.preprocessData  = 0;
 
-flags.extractTrainFt  = 0;
+flags.extractTrainFt  = 1;
 flags.distributeFt    = 1;
 
 flags.reduceTrainFS   = 1;
@@ -45,15 +46,15 @@ flags.sendData        = 0;
 
 SVM = 1;
 
-params.numModules      = 15;    % The number of SVMs/LDAs
+params.numModules      = 9;    % The number of SVMs/LDAs
 params.classMode       = SVM;
 
 params.numFt2Rmv       = 20;    % Number of features to remove from space
 
-params.FLAddChance_N   = 1;
-params.FLAddChance_S   = 1;
+params.FLAddChance_N   = 0.8;
+params.FLAddChance_S   = 0.2;
 
-params.windowSlide_sec = 1;
+params.windowSlide_sec = 4;
 params.windowSize_sec  = 4;
 
 params.patientNum      = 1;
@@ -369,7 +370,12 @@ if params.flags.runClassifier
 
         if params.numModules > 1
             for l = 1:size(labels_raw,1)
-                labels(l) = mode(labels_raw(l,:));
+                
+                if flags.unanimous
+                    
+                else
+                    labels(l) = mode(labels_raw(l,:));
+                end
             end
         else
             labels = labels_raw;
