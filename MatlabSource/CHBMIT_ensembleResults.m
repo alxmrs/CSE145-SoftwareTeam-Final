@@ -1,7 +1,10 @@
-function [ results ] = ...
-    CHBMIT_results( params, data, labels, lv_test, flags_augmentResults, bag )
+function [ results ] =      ...
+    CHBMIT_ensembleResults( ...
+    params, data, labels, lv_test)
 
-assert(nargin >= 5);
+assert(nargin == 4);
+
+flags_augmentResults = params.flags.augmentResults;
 
 numModules     = params.numModules;
 samplingFreq   = params.samplingFreq;
@@ -10,46 +13,36 @@ windowSlide    = params.windowSlide_sec*samplingFreq;
 testSegments   = params.testSegments;
 seizures       = params.seizures;
 
-if nargin == 5
-    bag = 0;
-end
 
-secsPerLabel   = params.windowSlide_sec;
+secsPerLabel = params.windowSlide_sec;
 
 fprintf('\n');
 fprintf('Results...\n');
 fprintf('\n');
 
-testSegments(1)
-testSegments(2)
-
-numSegs = testSegments(2)-testSegments(1)+1;
+numSegs = testSegments(end)-testSegments(1)+1;
 results = [];
 
 offset = 1;
 
-for seg = (1:numSegs)
+for seg = testSegments
+    
     count(seg).tot.S  = 0;
     count(seg).tot.N  = 0;
 
     count(seg).good.S = 0;
     count(seg).good.N = 0;
     
-    fprintf('Segment %d\n', testSegments(seg));
+    fprintf('Segment %d\n', seg);
     fprintf('\n');
     
-    seizureIndex = find(seizures(:,1) == testSegments(seg));
+    seizureIndex = find(seizures(:,1) == seg);
     numSeizures  = size(seizureIndex,1);
     
     segmentLength     = size(data(seg).record,2);
     segmentLength_sec = segmentLength/samplingFreq;
     
-    if bag
-        numLabelsInSeg = segmentLength/windowSize;
-        
-    else
-        numLabelsInSeg = numModules*segmentLength/windowSize;
-    end
+    numLabelsInSeg = segmentLength/windowSlide - windowSize/windowSlide +1;
     
     if numSeizures >= 1
         
@@ -98,10 +91,10 @@ for seg = (1:numSegs)
         if seizurePresent
             
             seizureStart = ...
-                seizures( find(seizures(:,1) == testSegments(seg)), 2);
+                seizures( find(seizures(:,1) == seg), 2);
             
             seizureEnd   = ...
-                seizures( find(seizures(:,1) == testSegments(seg)), 3);
+                seizures( find(seizures(:,1) == seg), 3);
             
             for seiz = (1:numSeizures)
                 
@@ -131,7 +124,7 @@ for seg = (1:numSegs)
     
     while seiz <= length(detectedSeizures)-1
         
-        thisRow  = [testSegments(seg) detectedSeizures(seiz)];
+        thisRow  = [seg detectedSeizures(seiz)];
         
         while detectedSeizures(seiz+1) == ...
                 detectedSeizures(seiz) + secsPerLabel
@@ -157,7 +150,7 @@ for seg = (1:numSegs)
     
     offset = offset + numLabelsInSeg;
     
-    fprintf('   %d/%d -> %.1f%% of SEIZURE labels are correct.\n', ...
+    fprintf('   %d/%d -> %.1f%% of SEIZURE labels are correct.\n',  ...
     	count(seg).good.S, count(seg).tot.S,                        ...
     	(100*count(seg).good.S)/count(seg).tot.S);
         
@@ -169,9 +162,9 @@ for seg = (1:numSegs)
     
     fprintf('\n');
     fprintf('   %d/%d -> %.1f%% of ALL labels are correct.\n', ...
-        count(seg).good.N+count(seg).good.S,               ...
-        count(seg).tot.N+count(seg).tot.S,                 ...
-     	(100*(count(seg).good.N+count(seg).good.S))/       ...
+        count(seg).good.N+count(seg).good.S,                   ...
+        count(seg).tot.N+count(seg).tot.S,                     ...
+     	(100*(count(seg).good.N+count(seg).good.S))/           ...
         (count(seg).tot.N+count(seg).tot.S));
     
     fprintf('\n');
@@ -194,12 +187,12 @@ if flags_augmentResults
         next_startTime = results(seiz+1, 2);
         next_endTime   = results(seiz+1, 3);
         
-        sameSeg = ((results(seiz+1), 1) == (results(seiz), 1));
-        
-        if sameSeg && (next_startTime <= this_endTime + 5*secsPerLabel)
+        if next_startTime <= this_endTime + 5*secsPerLabel
             
         	results(seiz,   3) = next_endTime;
             results(seiz+1, :) = [];
+            
+            seiz = seiz+1;
             
         elseif this_endTime <= this_startTime + secsPerLabel*2
             
