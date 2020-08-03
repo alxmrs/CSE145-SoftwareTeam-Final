@@ -1,4 +1,2 @@
-# CSE145_SoftwareTeam_Final
+# CSE145-SoftwareTeam-Final
 Final submission for CSE 145 Project: Seizure detection using SVM Ensemble 
-
-Please check out the dev branch to see our code. 
