@@ -1,55 +1,40 @@
-function [ results ] = ...
-    CHBMIT_results( params, data, labels, lv_test, flags_augmentResults, bag )
+function [ results ] = CHBMIT_results( params, data, labels, lv_test )
 
-assert(nargin >= 5);
+assert(nargin == 4);
 
 numModules     = params.numModules;
 samplingFreq   = params.samplingFreq;
 windowSize     = params.windowSize_sec*samplingFreq;
-windowSlide    = params.windowSlide_sec*samplingFreq;
 testSegments   = params.testSegments;
 seizures       = params.seizures;
-
-if nargin == 5
-    bag = 0;
-end
-
-secsPerLabel   = params.windowSlide_sec;
+secsPerLabel   = (params.windowSize_sec)/(params.numModules);
 
 fprintf('\n');
 fprintf('Results...\n');
 fprintf('\n');
 
-testSegments(1)
-testSegments(2)
-
 numSegs = testSegments(2)-testSegments(1)+1;
-results = [];
 
 offset = 1;
 
 for seg = (1:numSegs)
+    
     count(seg).tot.S  = 0;
     count(seg).tot.N  = 0;
 
     count(seg).good.S = 0;
     count(seg).good.N = 0;
     
-    fprintf('Segment %d\n', testSegments(seg));
+    fprintf('Segment %d\n', seg+(testSegments(1)-1));
     fprintf('\n');
     
-    seizureIndex = find(seizures(:,1) == testSegments(seg));
+    seizureIndex = find(seizures(:,1)==(seg+testSegments(1)-1));
     numSeizures  = size(seizureIndex,1);
     
     segmentLength     = size(data(seg).record,2);
     segmentLength_sec = segmentLength/samplingFreq;
     
-    if bag
-        numLabelsInSeg = segmentLength/windowSize;
-        
-    else
-        numLabelsInSeg = numModules*segmentLength/windowSize;
-    end
+    numLabelsInSeg = numModules*segmentLength/windowSize;
     
     if numSeizures >= 1
         
@@ -88,9 +73,9 @@ for seg = (1:numSegs)
         count(seg).tot.S = count(seg).tot.S + theseLabels(l);
         count(seg).tot.N = count(seg).tot.N + ~theseLabels(l);
         
-        time_sec = 1+(l-1)*secsPerLabel;
+        time_sec = 1+(l-1)*secsPerLabel + secsPerLabel/2;
             
-        if theseLabels(l)
+        if theseLabels
             detectedSeizures = ...
                 [detectedSeizures time_sec];
         end
@@ -98,10 +83,10 @@ for seg = (1:numSegs)
         if seizurePresent
             
             seizureStart = ...
-                seizures( find(seizures(:,1) == testSegments(seg)), 2);
+                seizures(find(seizures(:,1)==(seg+testSegments(1)-1)), 2);
             
             seizureEnd   = ...
-                seizures( find(seizures(:,1) == testSegments(seg)), 3);
+                seizures(find(seizures(:,1)==(seg+testSegments(1)-1)), 3);
             
             for seiz = (1:numSeizures)
                 
@@ -126,28 +111,14 @@ for seg = (1:numSegs)
            
     end
     
-    
-    seiz = 1;
-    
-    while seiz <= length(detectedSeizures)-1
+    for seiz = (1:length(detectedSeizures)-1)
         
-        thisRow  = [testSegments(seg) detectedSeizures(seiz)];
-        
-        while detectedSeizures(seiz+1) == ...
+        if detectedSeizures(seiz+1) ~= ...
                 detectedSeizures(seiz) + secsPerLabel
-        
-            seiz = seiz+1;
             
-            if seiz == length(detectedSeizures)
-                break;
-            end
-           
+            
+            
         end
-        
-        thisRow = [thisRow  detectedSeizures(seiz) + secsPerLabel];
-        results = [results; thisRow];
-        
-        seiz = seiz + 1;
         
     end
     
@@ -175,49 +146,11 @@ for seg = (1:numSegs)
         (count(seg).tot.N+count(seg).tot.S));
     
     fprintf('\n');
-end
-
-results_preAugmentation = results
-
-if flags_augmentResults
-    
     fprintf('\n');
-    fprintf('Augmenting Results...\n');
-    
-    seiz = 1;
-    
-    while seiz <= size(results,1)-1
-        
-        this_startTime = results(seiz, 2);
-        this_endTime   = results(seiz, 3);
-        
-        next_startTime = results(seiz+1, 2);
-        next_endTime   = results(seiz+1, 3);
-        
-        sameSeg = ((results(seiz+1), 1) == (results(seiz), 1));
-        
-        if sameSeg && (next_startTime <= this_endTime + 5*secsPerLabel)
-            
-        	results(seiz,   3) = next_endTime;
-            results(seiz+1, :) = [];
-            
-        elseif this_endTime <= this_startTime + secsPerLabel*2
-            
-            results(seiz,:) = [];
-            
-        else
-            seiz = seiz+1;
-        end
-        
-    end
-    
-    fprintf('Done.\n');
-    results_posAugmentation = results
-    
 end
 
 
-fprintf('\n');
+    
 fprintf('\n');
 fprintf('Process Complete.\n');
 fprintf('\n');

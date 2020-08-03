@@ -1,4 +1,5 @@
 function flist = Classifier_findWorstFeatures(fv, lv, num_ft2rmv, ... 
+>>>>>>> master
                                               classificationMode)
 %flist = Classifier_findWorstFeatures(fv_N, fv_S, num_ft2rmv, MLE_flag)
 %
